@@ -5,6 +5,7 @@
 --   p_l_desde / p_l_hasta   rango comparable (incluidos)
 --   p_corte                 si no es NULL, el ULTIMO dia de cada rango solo cuenta horas menores a este valor (igual que el reporte de Telegram)
 --   p_tiendas               NULL = todas; o arreglo de claves (para gerentes)
+--   Las tiendas con activa = false (cerradas, ej. TC29 Cardel) se excluyen de los dos periodos.
 CREATE OR REPLACE FUNCTION rpt_ventas(
     p_a_desde date, p_a_hasta date,
     p_l_desde date, p_l_hasta date,
@@ -31,7 +32,9 @@ WITH x AS (
             CASE WHEN NOT d.es_baja THEN d.folio_venta END AS folio
         FROM ventas_detalle d
         LEFT JOIN formas_pago f ON f.tipo_venta = d.tipo_venta
+        LEFT JOIN tiendas ti    ON ti.clave = d.clave_muebleria
         WHERE (d.fecha BETWEEN p_a_desde AND p_a_hasta OR d.fecha BETWEEN p_l_desde AND p_l_hasta)
+          AND COALESCE(ti.activa, true)                 -- tiendas cerradas (activa = false) no cuentan, igual que en Telegram
           AND (p_tiendas IS NULL OR d.clave_muebleria = ANY (p_tiendas))
     ) s
     WHERE s.per IS NOT NULL

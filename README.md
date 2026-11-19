@@ -1,7 +1,7 @@
 # Reportes de venta (Crediland)
 
 Web de reportes de venta con inicio de sesion: el dueno ve todas las tiendas y cada gerente solo las suyas.
-Muestra venta del dia (con hora), acumulado del mes o del Buen Fin, por tienda, forma de pago y vendedor, contra el anio pasado.
+Muestra venta del dia (con hora) y acumulado del mes, por tienda, forma de pago y vendedor, contra el anio pasado.
 Venta = **con intereses y sin IVA**, neta de cancelaciones (la misma cifra que el Flash).
 
 ```
@@ -44,6 +44,6 @@ Copia `cargador/` a `C:\vtahora\` y crea ahi `web_config.json` (ver `subir_venta
 
 ## Reglas de negocio (donde cambiarlas)
 - Forma de pago por tipo de venta: tabla `formas_pago` (SQL). Ej. mover U001 (Credibips) a otra categoria.
-- Periodos de eventos (Buen Fin): `src/lib/eventos.ts`.
-- Comparativos: *mismo dia de la semana* (364 dias antes), *misma fecha* (un anio antes) y *evento* (dia N contra dia N del evento anterior).
+- Comparativos de la vista *Dia*: *mismo dia de la semana* (364 dias antes) o *misma fecha* (un anio antes). El *Acumulado* siempre es a fechas iguales (1 al N del mes vs 1 al N del mes del anio pasado).
+- Tiendas cerradas: `UPDATE tiendas SET activa = false WHERE clave = 'TC__';` (se excluyen de los reportes, como en Telegram).
 - Para el dia de hoy solo cuentan las horas completas (igual que el reporte de Telegram).

@@ -1,8 +1,7 @@
 import "server-only";
 import { admin } from "./supabase/admin";
-import { eventoDe, aMs, aIso, sumaDias, type EventoActivo } from "./eventos";
 
-export type Modo = "semana" | "fecha" | "evento";
+export type Modo = "semana" | "fecha";
 export type Fila = { clave?: string; nombre: string; a: number; l: number; ua?: number; ul?: number; ta?: number; tl?: number };
 export type Reporte = {
   total: { a: number; l: number; ua: number; ul: number; ta: number; tl: number };
@@ -13,6 +12,10 @@ export type Reporte = {
 };
 
 const TZ = "America/Mexico_City";
+const MS = 86400000;
+const aMs = (iso: string) => Date.parse(iso + "T00:00:00Z");
+const aIso = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+export const sumaDias = (iso: string, n: number) => aIso(aMs(iso) + n * MS);
 
 export function ahoraMx() {
   const f = new Intl.DateTimeFormat("en-CA", { timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hourCycle: "h23" });
@@ -27,37 +30,24 @@ export function haceUnAnio(iso: string) {
   return `${y - 1}-${String(m).padStart(2, "0")}-${String(Math.min(d, dim)).padStart(2, "0")}`;
 }
 
-export function fechaComparable(fecha: string, modo: Modo, ev: EventoActivo | null) {
-  if (modo === "evento" && ev) return sumaDias(ev.lyInicio, ev.dia - 1);
-  if (modo === "fecha") return haceUnAnio(fecha);
-  return sumaDias(fecha, -364); // mismo dia de la semana
+export function fechaComparable(fecha: string, modo: Modo) {
+  return modo === "fecha" ? haceUnAnio(fecha) : sumaDias(fecha, -364); // misma fecha | mismo dia de la semana
 }
 
 export type Consulta = {
   fecha: string;
   modo: Modo;
-  acumulado: boolean; // false = solo el dia; true = del inicio del mes (o del evento) al dia
+  acumulado: boolean; // false = solo el dia; true = del dia 1 del mes al dia
   tiendas: string[] | null; // null = todas
   hastaHora?: number; // corte manual; por defecto la hora actual si la fecha es hoy
 };
 
 export async function consultar(c: Consulta) {
-  const ev = eventoDe(c.fecha);
-  const modo: Modo = c.modo === "evento" && !ev ? "semana" : c.modo;
-  const lyFecha = fechaComparable(c.fecha, modo, ev);
-
-  let aDesde = c.fecha;
-  let lDesde = lyFecha;
-  if (c.acumulado) {
-    if (modo === "evento" && ev) {
-      aDesde = ev.inicio;
-      lDesde = ev.lyInicio;
-    } else {
-      aDesde = c.fecha.slice(0, 8) + "01";
-      const desfase = Math.round((aMs(c.fecha) - aMs(lyFecha)) / 86400000);
-      lDesde = aIso(aMs(aDesde) - desfase * 86400000);
-    }
-  }
+  // El acumulado SIEMPRE es a fechas iguales (1 al N del mes vs 1 al N del mes del anio pasado), nunca a dias de la semana.
+  const modo: Modo = c.acumulado ? "fecha" : c.modo;
+  const lyFecha = fechaComparable(c.fecha, modo);
+  const aDesde = c.acumulado ? c.fecha.slice(0, 8) + "01" : c.fecha;
+  const lDesde = c.acumulado ? haceUnAnio(aDesde) : lyFecha;
 
   const { hoy, hora } = ahoraMx();
   let corte: number | null = null;
@@ -74,7 +64,7 @@ export async function consultar(c: Consulta) {
     p_tiendas: c.tiendas,
   });
   if (error) throw new Error(error.message);
-  return { r: data as Reporte, ev, modo, aDesde, lDesde, lHasta: lyFecha, corte };
+  return { r: data as Reporte, modo, aDesde, lDesde, lHasta: lyFecha, corte };
 }
 
 export async function ultimaActualizacion(): Promise<string | null> {

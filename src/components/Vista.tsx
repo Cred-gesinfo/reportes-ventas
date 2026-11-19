@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { obtenerAcceso } from "@/lib/acceso";
 import { consultar, ahoraMx, ultimaActualizacion, type Modo } from "@/lib/reporte";
-import { eventoDe } from "@/lib/eventos";
 import { pesos, dif, num, varPct, clase, rangoLargo, haceCuanto } from "@/lib/format";
 import { cerrarSesion } from "@/app/acciones";
 import { Tabla } from "./Tabla";
@@ -29,9 +28,8 @@ export async function Vista({ sp, acumulado }: { sp: SP; acumulado: boolean }) {
   const { hoy } = ahoraMx();
   const fechaIn = uno(sp.fecha);
   const fecha = fechaIn && /^\d{4}-\d{2}-\d{2}$/.test(fechaIn) ? fechaIn : hoy;
-  const evDia = eventoDe(fecha);
   const modoIn = uno(sp.modo);
-  const modo: Modo = modoIn === "semana" || modoIn === "fecha" || modoIn === "evento" ? modoIn : evDia ? "evento" : "semana";
+  const modo: Modo = modoIn === "fecha" ? "fecha" : "semana";
   const tiendaIn = uno(sp.tienda);
   const claves = acceso.tiendas.map((t) => t.clave);
   const seleccion = tiendaIn && claves.includes(tiendaIn) ? [tiendaIn] : null;
@@ -39,29 +37,22 @@ export async function Vista({ sp, acumulado }: { sp: SP; acumulado: boolean }) {
   const tiendas = seleccion ?? (acceso.rol === "dueno" ? null : claves);
   const hIn = Number(uno(sp.h));
 
-  const [{ r, ev, modo: modoEf, aDesde, lDesde, lHasta, corte }, actualizado] = await Promise.all([
+  const [{ r, modo: modoEf, aDesde, lDesde, lHasta, corte }, actualizado] = await Promise.all([
     consultar({ fecha, modo, acumulado, tiendas, hastaHora: Number.isFinite(hIn) && hIn > 0 ? hIn : undefined }),
     ultimaActualizacion(),
   ]);
 
-  const rojo = modoEf === "evento";
   const ay = !acumulado && fecha === hoy ? "Hoy" : "Actual";
   const ly = "Año pasado";
   const t = r.total;
   const ticketA = t.ta ? t.a / t.ta : 0;
   const ticketL = t.tl ? t.l / t.tl : 0;
-  const etiquetaModo =
-    modoEf === "evento" && ev
-      ? acumulado
-        ? `${ev.corto}: del día 1 al día ${ev.dia} de ${ev.total}, contra los mismos días del evento anterior`
-        : `${ev.corto}: día ${ev.dia} de ${ev.total} contra el mismo día del evento anterior`
-    : modoEf === "fecha" ? "Misma fecha del año pasado"
-    : "Mismo día de la semana del año pasado";
+  const etiquetaModo = modoEf === "fecha" ? "Misma fecha del año pasado" : "Mismo día de la semana del año pasado";
   const vacio = !t.a && !t.l;
   const q = (extra: Record<string, string>) => new URLSearchParams({ fecha, modo: modoEf, ...(seleccion ? { tienda: seleccion[0] } : {}), ...extra }).toString();
 
   return (
-    <div className={rojo ? "evento" : ""}>
+    <div>
       <header className="top">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo.png" alt="Crediland" className="logo" />
@@ -79,7 +70,7 @@ export async function Vista({ sp, acumulado }: { sp: SP; acumulado: boolean }) {
 
       <main className="pagina">
         <div className="titulo">
-          <h1>{acumulado ? (modoEf === "evento" && ev ? `Acumulado del ${ev.corto}` : "Acumulado del mes") : rojo && ev ? `Venta del día · ${ev.corto}` : "Venta del día"}</h1>
+          <h1>{acumulado ? "Acumulado del mes" : "Venta del día"}</h1>
           <p className="muted">
             {etiquetaModo}
             {corte !== null ? ` · hasta las ${String(corte).padStart(2, "0")}:00 h` : ""}
@@ -95,14 +86,15 @@ export async function Vista({ sp, acumulado }: { sp: SP; acumulado: boolean }) {
             Fecha
             <input type="date" name="fecha" defaultValue={fecha} max={hoy} />
           </label>
-          <label>
-            Comparar contra
-            <select name="modo" defaultValue={modoEf}>
-              <option value="semana">Mismo día de la semana</option>
-              <option value="fecha">Misma fecha</option>
-              {evDia && <option value="evento">{evDia.corto} (día {evDia.dia})</option>}
-            </select>
-          </label>
+          {!acumulado && (
+            <label>
+              Comparar contra
+              <select name="modo" defaultValue={modoEf}>
+                <option value="semana">Mismo día de la semana</option>
+                <option value="fecha">Misma fecha</option>
+              </select>
+            </label>
+          )}
           {acceso.tiendas.length > 1 && (
             <label>
               Tienda
