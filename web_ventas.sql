@@ -3,7 +3,8 @@
 -- venta_total = venta CON intereses y sin IVA = ROUND(total / 1.16, 2): es la definicion que ya cuadra con el Flash.
 -- vtaretail e intereses se conservan solo para analisis (misma logica que 01_ventas.sql).
 -- generico = linea+ramo+categoria+tipo del articulo (para la venta por categoria).
--- NO incluye datos sensibles: sin clave_cuenta (cliente), sin nomina, sin saldos ni enganche.
+-- cuenta = clave_cuenta del cliente: la web solo la usa para CONTAR clientes distintos y nunca la muestra.
+-- NO incluye nomina, saldos ni enganche.
 -- Solo lectura. Compatible con MySQL antiguo (sin CTE ni funciones de ventana).
 --
 -- Marcadores que reemplaza el cargador (para probar en Navicat, cambialos a mano):
@@ -21,6 +22,7 @@ SELECT
     CAST(t.clave_vendedor AS CHAR)  AS clave_vendedor,
     CAST(t.tipo_venta AS CHAR)      AS tipo_venta,
     CAST(t.generico AS CHAR)        AS generico,
+    CAST(t.cuenta AS CHAR)          AS cuenta,
     CAST(t.cantidad AS CHAR)        AS cantidad,
     CAST(t.venta_total AS CHAR)     AS venta_total,
     CAST(t.vtaretail AS CHAR)       AS vtaretail,
@@ -37,6 +39,7 @@ SELECT
     v.clave_vendedor,
     IF(d.responsable_cuenta = 'U001', 'U001', v.tipo_venta) AS tipo_venta,
     CONCAT(a.linea, a.ramo, a.categoria, a.tipo) AS generico,
+    v.clave_cuenta AS cuenta,
     CAST(m.cantidad AS SIGNED) AS cantidad,
     ROUND(m.total / 1.16, 2) AS venta_total,
     CASE
@@ -73,6 +76,7 @@ SELECT
     x.clave_vendedor,
     IF(p.responsable_cuenta = 'U001', 'U001', x.tipo_venta) AS tipo_venta,
     CONCAT(tt.linea, tt.ramo, tt.categoria, tt.tipo) AS generico,
+    x.clave_cuenta AS cuenta,
     CAST(g.cantidad AS SIGNED) * -1 AS cantidad,
     ROUND(g.total / 1.16, 2) * -1 AS venta_total,
     ROUND(IF(x.tipo_venta = '1I' AND p.responsable_cuenta <> 'U001', (g.total - g.interes) / 1.16, (g.total) / 1.16), 2) * -1 AS vtaretail,
